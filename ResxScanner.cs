@@ -110,24 +110,17 @@ namespace ResxScanner
 
                 foreach (var doc in docs)
                 {
-
-                    //var resourceName = doc.Name[..doc.Name.LastIndexOf(".Designer.cs")];
                     var root = await doc.GetSyntaxRootAsync();
                     var semanticModel = await doc.GetSemanticModelAsync();
-
-
                     var elements = root.DescendantNodesAndSelf().OfType<ElementAccessExpressionSyntax>().Where(element =>
                     {
                         var firstIdentifierName = element.DescendantNodes()?.FirstOrDefault();
                         if (firstIdentifierName != null && firstIdentifierName is IdentifierNameSyntax)
                         {
-                            var symbolInfo = semanticModel.GetSymbolInfo(firstIdentifierName);
-                            var propertySymbol = (IPropertySymbol)(symbolInfo.Symbol is IPropertySymbol ? symbolInfo.Symbol : symbolInfo.CandidateSymbols.OfType<IPropertySymbol>().FirstOrDefault());
-                            if (propertySymbol?.Type != null)
-                            {
-                                var iStringLocalizerType = semanticModel.Compilation.GetTypeByMetadataName("Microsoft.Extensions.Localization.IStringLocalizer");
-                                return semanticModel.Compilation.HasImplicitConversion(propertySymbol.Type, iStringLocalizerType);
-                            }
+                            var symbol = semanticModel.GetSymbolInfo(firstIdentifierName).Symbol ?? semanticModel.GetSymbolInfo(firstIdentifierName).CandidateSymbols.FirstOrDefault();
+                            var typeInfo = semanticModel.GetTypeInfo(firstIdentifierName);
+                            var iStringLocalizerType = semanticModel.Compilation.GetTypeByMetadataName("Microsoft.Extensions.Localization.IStringLocalizer");
+                            return semanticModel.Compilation.HasImplicitConversion(typeInfo.Type, iStringLocalizerType) || (symbol is IPropertySymbol && semanticModel.Compilation.HasImplicitConversion((symbol as IPropertySymbol)?.Type, iStringLocalizerType));
                         }
                         return false;
                     }).Select(element =>
@@ -136,11 +129,30 @@ namespace ResxScanner
                         if (expression != null)
                         {
                             var key = semanticModel.GetConstantValue(expression).Value?.ToString();
+                            string resourceName = null;
+                            //Get the generic type if exists
+                            var firstDescendingNode = element.DescendantNodes()?.FirstOrDefault();
+                            if (firstDescendingNode != null)
+                            {
+                                var nodeType = semanticModel.GetTypeInfo(firstDescendingNode).Type as INamedTypeSymbol;
+                                if (nodeType != null && nodeType.IsGenericType)
+                                {
+                                    resourceName = nodeType.TypeArguments.FirstOrDefault().ToDisplayString();
+                                }
+                            }
+                            if (resourceName == null)
+                            {
+                                var classDeclarationSyntax = element.Ancestors()?.OfType<ClassDeclarationSyntax>().FirstOrDefault();
+                                if (classDeclarationSyntax != null)
+                                {
+                                    resourceName = semanticModel.GetDeclaredSymbol(classDeclarationSyntax)?.ToDisplayString();
+                                }
+                            }
                             IEnumerable<string> paths = [];
                             SyntaxNode callerPropertyOrMethod = null;
                             foreach (var ancestor in element.Ancestors())
                             {
-                                if (ancestor is PropertyDeclarationSyntax | ancestor is MethodDeclarationSyntax)
+                                if (ancestor is PropertyDeclarationSyntax || ancestor is MethodDeclarationSyntax)
                                 {
                                     callerPropertyOrMethod = ancestor;
                                     break;
@@ -152,16 +164,7 @@ namespace ResxScanner
                                 if (callerPropertyOrMethodDeclaredSymbol != null)
                                 {
                                     var references = SymbolFinder.FindReferencesAsync(callerPropertyOrMethodDeclaredSymbol, solution).GetAwaiter().GetResult();
-                                    paths = references.SelectMany(r => r.Locations).Where(l => l.Document.FilePath != doc.FilePath).Select(l => Path.GetRelativePath(solutionDirectory, l.Document.FilePath)).Distinct();
-                                }
-                            }
-                            string resourceName = null;
-                            if (expression is LiteralExpressionSyntax)
-                            {
-                                var classDeclarationSyntax = element.Ancestors()?.OfType<ClassDeclarationSyntax>().FirstOrDefault();
-                                if (classDeclarationSyntax != null)
-                                {
-                                    resourceName = semanticModel.GetDeclaredSymbol(classDeclarationSyntax)?.ToDisplayString();
+                                    paths = references.SelectMany(r => r.Locations.Select(l=>l.Document.FilePath)).Union(references.SelectMany(r => r.Definition.Locations.Select(l => l.SourceTree.FilePath))).Where(path=> callerPropertyOrMethod is MethodDeclarationSyntax || path != doc.FilePath).Distinct().Select(path => Path.GetRelativePath(solutionDirectory, path));
                                 }
                             }
                             return (resourceName, key, paths);

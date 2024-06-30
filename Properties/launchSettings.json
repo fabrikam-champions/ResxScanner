@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ResxScanner": {
+      "commandName": "Project",
+      "commandLineArgs": "-s \"D:\\Work\\iNUPCO\\Repos\\INUPCO.Catalog\\INUPCO.Catalog.sln\" -d \"D:\\thenewkeys.json\""
+    }
+  }
+}
