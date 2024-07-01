@@ -38,6 +38,7 @@ namespace ResxScanner
                                   group k by new { k.ResourceName, k.Key } into g
                                   select new
                                   {
+                                      ResourceName = g.Key.ResourceName,
                                       Key = $"{g.Key.ResourceName}.{g.Key.Key}",
                                       En = g.Where(x => string.IsNullOrEmpty(x.Culture) || x.Culture.StartsWith("en", StringComparison.OrdinalIgnoreCase)).Select(x => x.Value).Max(),
                                       Ar = g.Where(x => !string.IsNullOrEmpty(x.Culture) && x.Culture.StartsWith("ar", StringComparison.OrdinalIgnoreCase)).Select(x => x.Value).Max(),
@@ -48,7 +49,7 @@ namespace ResxScanner
                                           Paths = g.SelectMany(x => x.Paths ?? []).Distinct().Order().Take(args.MaxPathCount)
                                       }
                                   };
-                var obj = groupedKeys.ToImmutableSortedDictionary(x => x.Key, x => new { x.En, x.Ar, x.Desc, x.Usage });
+                var obj = groupedKeys.ToImmutableSortedDictionary(x => x.Key, x => new { x.ResourceName, x.En, x.Ar, x.Desc, x.Usage });
                 var options = new JsonSerializerOptions { WriteIndented = false };
                 byte[] json = JsonSerializer.SerializeToUtf8Bytes(obj, options);
                 await File.WriteAllBytesAsync(args.Destination, json);
