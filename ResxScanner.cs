@@ -38,6 +38,7 @@ namespace ResxScanner
                                   group k by new { k.ResourceName, k.Key } into g
                                   select new
                                   {
+                                      ResourceName = g.Key.ResourceName,
                                       Key = $"{g.Key.ResourceName}.{g.Key.Key}",
                                       En = g.Where(x => string.IsNullOrEmpty(x.Culture) || x.Culture.StartsWith("en", StringComparison.OrdinalIgnoreCase)).Select(x => x.Value).Max(),
                                       Ar = g.Where(x => !string.IsNullOrEmpty(x.Culture) && x.Culture.StartsWith("ar", StringComparison.OrdinalIgnoreCase)).Select(x => x.Value).Max(),

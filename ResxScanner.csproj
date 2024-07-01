@@ -9,7 +9,7 @@
 	<JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 	<PackAsTool>True</PackAsTool>
 	<GenerateRuntimeConfigDevFile>true</GenerateRuntimeConfigDevFile>
-	<version>1.0.1</version>
+	<version>1.0.2</version>
 	<VersionSuffix Condition=" '$(BUILD_NUMBER)' == '' ">pre$([System.DateTime]::Now.ToString("yyyyMMddHHmm"))</VersionSuffix>
 	<title>ResxScanner</title>
 	<authors>FabrikamChampions</authors>
